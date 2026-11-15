@@ -1,0 +1,113 @@
+
+name: MultiToon Shorts
+
+on:
+  schedule:
+    - cron: "30 21 * * *"
+    - cron: "30 7 * * *"
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "morning (10 AM) or evening (7 PM)"
+        default: "morning"
+        type: choice
+        options: [morning, evening]
+      mode:
+        description: "build_only = safe test. upload_test = public test. normal = real run."
+        default: "build_only"
+        type: choice
+        options: [build_only, upload_test, normal]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: multitoon-shorts
+  cancel-in-progress: false
+
+jobs:
+  make-short:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out slot and mode
+        id: cfg
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "${{ github.event.schedule }}" = "30 21 * * *" ]; then S=morning; else S=evening; fi
+            M=normal
+          else
+            S="${{ inputs.slot }}"; M="${{ inputs.mode }}"
+          fi
+          echo "slot=$S" >> "$GITHUB_OUTPUT"
+          echo "mode=$M" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ffmpeg and Hindi fonts
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-lohit-deva fontconfig
+          fc-cache -f
+
+      - name: Install Python packages
+        run: pip install -r requirements.txt
+
+      - name: Make the Short
+        id: make
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          UPLOAD_MODE: ${{ vars.UPLOAD_MODE || 'manual' }}
+          MADE_FOR_KIDS: ${{ vars.MADE_FOR_KIDS || 'false' }}
+          CHANNEL_NAME: MultiToon Network
+        run: python pipeline.py --slot "${{ steps.cfg.outputs.slot }}" --mode "${{ steps.cfg.outputs.mode }}"
+
+      - name: Publish video for download
+        if: steps.make.outputs.release == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.make.outputs.tag }}" \
+            "${{ steps.make.outputs.dir }}/video.mp4" \
+            "${{ steps.make.outputs.dir }}/upload_notes.txt" \
+            --title "${{ steps.make.outputs.title }}" \
+            --notes "Download video.mp4 and upload it in the YouTube app. Title, description and tags are in upload_notes.txt."
+
+      - name: Save history and error log
+        if: always()
+        run: |
+          git config user.name "multitoon-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data || true
+          git diff --cached --quiet || (git commit -m "update history" && git pull --rebase && git push)
+
+      - name: Keep last test video for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-${{ github.run_id }}
+          path: output/**/video.mp4
+          retention-days: 3
+          if-no-files-found: ignore
+
+      - name: Alert me if the run crashed
+        if: failure()
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          if [ -n "$NTFY_TOPIC" ]; then
+            curl -s -H "Title: MultiToon: workflow FAILED" -H "Priority: high" \
+              -d "Open GitHub > Actions to see the red run (${{ steps.cfg.outputs.slot }})." \
+              "https://ntfy.sh/$NTFY_TOPIC" || true
+          fi
