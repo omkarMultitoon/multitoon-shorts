@@ -59,3 +59,16 @@ ReadTimeout: HTTPSConnectionPool(host='generativelanguage.googleapis.com', port=
     raise ReadTimeout(e, request=request)
 requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='generativelanguage.googleapis.com', port=443): Read timed out. (read timeout=120)
 
+--- 2026-11-18 14:14 IST slot=evening
+RuntimeError: Gemini unavailable after retries (HTTP 503). Daily free limit may be used up.
+Traceback (most recent call last):
+  File "/home/runner/work/multitoon-shorts/multitoon-shorts/pipeline.py", line 582, in main
+    story = make_story(topic, history, fake)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/multitoon-shorts/multitoon-shorts/pipeline.py", line 250, in make_story
+    s = gemini_json(story_prompt(topic, recent, fix))
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/multitoon-shorts/multitoon-shorts/pipeline.py", line 215, in gemini_json
+    raise RuntimeError(f"Gemini unavailable after retries ({last}). Daily free limit may be used up.")
+RuntimeError: Gemini unavailable after retries (HTTP 503). Daily free limit may be used up.
+
