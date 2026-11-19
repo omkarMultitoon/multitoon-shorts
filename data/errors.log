@@ -102,3 +102,12 @@ ReadTimeout: HTTPSConnectionPool(host='generativelanguage.googleapis.com', port=
     raise ReadTimeout(e, request=request)
 requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='generativelanguage.googleapis.com', port=443): Read timed out. (read timeout=120)
 
+--- 2026-11-20 03:53 IST slot=morning
+RuntimeError: All image sources failed: pollinations: Pollinations 402 | pollinations: Pollinations 402
+Traceback (most recent call last):
+  File "/home/runner/work/multitoon-shorts/multitoon-shorts/pipeline.py", line 599, in main
+    make_image(sc, story["style"], p, seed=int(hashlib.md5(key.encode()).hexdigest(), 16) % 10**6,
+  File "/home/runner/work/multitoon-shorts/multitoon-shorts/pipeline.py", line 319, in make_image
+    raise RuntimeError("All image sources failed: " + " | ".join(errs[-3:]))
+RuntimeError: All image sources failed: pollinations: Pollinations 402 | pollinations: Pollinations 402
+
